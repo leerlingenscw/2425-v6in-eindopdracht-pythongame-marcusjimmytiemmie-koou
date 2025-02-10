@@ -15,9 +15,12 @@ WHITE = (255, 255, 255)
 GREEN = (34, 139, 34)
 BLACK = (0, 0, 0)
 RED = (200, 0, 0)
+YELLOW = (255, 255, 0)
 
-# Create the game screen
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+# Create the game screen in fullscreen mode
+screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+SCREEN_WIDTH, SCREEN_HEIGHT = screen.get_size()  # Get new screen size after switching to fullscreen
+
 pygame.display.set_caption("Blackjack - VWO 6 Final Project")
 
 # Load background
@@ -204,17 +207,18 @@ class BlackjackGame:
                             selecting_bet = False
 
             # 🛑 Step 2: Start Round
-            self.player_balance -= self.bet_amount  
+            self.player_balance -= self.bet_amount
             self.deck = CardDeck()
             self.player_hand = PlayerHand()
             self.dealer_hand = PlayerHand()
-            self.split_hand = None  
+            self.split_hand = None
             self.active_hand = self.player_hand  # Track active hand
             self.player_turn = True
             self.round_over = False
             self.doubled_down = False
             self.first_move = True  # ✅ Track if it's the player's first move
 
+            # Initial cards deal
             for _ in range(2):
                 self.player_hand.add_card(self.deck.draw_card())
                 self.dealer_hand.add_card(self.deck.draw_card())
@@ -240,10 +244,19 @@ class BlackjackGame:
                 if self.split_hand:
                     self.split_hand.display(500, 400)
                 self.dealer_hand.display(200, 100, hide_first=self.player_turn)
-                display_text(f"Player Total: {self.active_hand.total_value}", 200, 550, WHITE)
+                display_text(f"Player Total (Hand 1): {self.player_hand.total_value}", 200, 550, WHITE)
+                if self.split_hand:
+                    display_text(f"Player Total (Hand 2): {self.split_hand.total_value}", 500, 550, WHITE)
                 display_text(f"Dealer Total: {'?' if self.player_turn else self.dealer_hand.total_value}", 200, 250, WHITE)
                 display_text(f"Balance: ${self.player_balance}", 20, 20)
                 display_text(f"Bet: ${self.bet_amount}", 20, 50)
+
+                # **Display active hand indicator only when splitting**
+                if self.split_hand:
+                    if self.active_hand == self.player_hand:
+                        pygame.draw.rect(screen, (255, 0, 0), (200, 390, CARD_WIDTH * 2, CARD_HEIGHT), 5)  # Red border for Hand 1
+                    elif self.active_hand == self.split_hand:
+                        pygame.draw.rect(screen, (255, 0, 0), (500, 390, CARD_WIDTH * 2, CARD_HEIGHT), 5)  # Red border for Hand 2
 
                 # Button Labels
                 display_text("Hit", SCREEN_WIDTH // 2 - 180, SCREEN_HEIGHT - 65, BLACK)
@@ -251,7 +264,7 @@ class BlackjackGame:
                 if double_rect:
                     display_text("Double", SCREEN_WIDTH // 2 + 120, SCREEN_HEIGHT - 65, BLACK)
                 if split_rect:
-                    display_text("Split", SCREEN_WIDTH // 2 + 270, SCREEN_HEIGHT - 65, BLACK)
+                    display_text("Split", SCREEN_WIDTH // 2 + 270, SCREEN_HEIGHT // 2 - 65, BLACK)
 
                 pygame.display.flip()
 
@@ -264,17 +277,23 @@ class BlackjackGame:
 
                         if hit_rect.collidepoint(mouse_pos) and self.player_turn:
                             self.active_hand.add_card(self.deck.draw_card())
-                            self.first_move = False  # ✅ Disable double down after first move
                             if self.active_hand.total_value > 21:
                                 self.status_message = "You Busted! Dealer Wins."
                                 self.round_over = True
 
                         elif stand_rect.collidepoint(mouse_pos):
-                            self.player_turn = False
-                            while self.dealer_hand.total_value < 17:
-                                self.dealer_hand.add_card(self.deck.draw_card())
-                            self.round_over = True
-                            self.status_message = determine_winner(self.player_hand, self.dealer_hand)
+                            if self.active_hand == self.player_hand:
+                                # Player finished Hand 1, switch to Hand 2 if split
+                                if self.split_hand:
+                                    self.active_hand = self.split_hand
+                                    self.first_move = True  # Reset first move for Hand 2
+                                else:
+                                    # Dealer's turn after player finishes Hand 1
+                                    self.player_turn = False
+                                    while self.dealer_hand.total_value < 17:
+                                        self.dealer_hand.add_card(self.deck.draw_card())
+                                    self.round_over = True
+                                    self.status_message = determine_winner(self.player_hand, self.dealer_hand)
 
                         elif double_rect and double_rect.collidepoint(mouse_pos):
                             if self.first_move:  # ✅ Double down only possible on first move
@@ -292,10 +311,11 @@ class BlackjackGame:
                         elif split_rect and split_rect.collidepoint(mouse_pos):
                             if can_split and self.split_hand is None:
                                 self.split_hand = PlayerHand()
-                                self.split_hand.add_card(self.player_hand.cards.pop())
-                                self.player_hand.add_card(self.deck.draw_card())
-                                self.split_hand.add_card(self.deck.draw_card())
-                                self.active_hand = self.player_hand  # Start playing left hand first
+                                self.split_hand.add_card(self.player_hand.cards.pop())  # Take one card for the second hand
+                                self.player_hand.add_card(self.deck.draw_card())  # Deal a new card for the first hand
+                                self.split_hand.add_card(self.deck.draw_card())  # Deal a new card for the second hand
+                                self.active_hand = self.player_hand  # Start playing the first hand
+                                self.first_move = True  # Reset first move for both hands
 
             # ✅ Display "Next Round" button before restarting the game
             waiting_for_next_round = True
@@ -305,6 +325,8 @@ class BlackjackGame:
                     screen.blit(background, (0, 0))
 
                 self.player_hand.display(200, 400)
+                if self.split_hand:
+                    self.split_hand.display(500, 400)
                 self.dealer_hand.display(200, 100, hide_first=False)
                 display_text(self.status_message, SCREEN_WIDTH // 2 - 70, SCREEN_HEIGHT // 2 - 50, RED)
 
@@ -318,9 +340,20 @@ class BlackjackGame:
                         self.is_playing = False
                         waiting_for_next_round = False
                     elif event.type == pygame.MOUSEBUTTONDOWN and next_round_rect.collidepoint(pygame.mouse.get_pos()):
+                        # Reset for next round
+                        self.reset_round()
                         waiting_for_next_round = False
 
-
+        def reset_round(self):
+            """Reset all necessary variables for the next round."""
+            self.player_hand.clear_hand()
+            self.split_hand = None
+            self.dealer_hand.clear_hand()
+            self.first_move = True
+            self.doubled_down = False
+            self.round_over = False
+            self.active_hand = self.player_hand
+                         
         pygame.quit()
 if __name__ == "__main__":
     game = BlackjackGame()
