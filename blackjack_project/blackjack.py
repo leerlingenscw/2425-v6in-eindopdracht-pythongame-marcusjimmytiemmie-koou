@@ -108,8 +108,8 @@ def determine_winner(player, dealer):
         return "Dealer Wins!"
 
 def display_text(content, x, y, color=WHITE):
-    """Draw text on screen."""
-    text_render = font.render(content, True, color)
+    """Renders text on the screen with a transparent background."""
+    text_render = font.render(content, True, color)  # No background color
     screen.blit(text_render, (x, y))
 
 class BlackjackGame:
@@ -167,28 +167,161 @@ class BlackjackGame:
                         lose_sound.play()
 
     def run(self):
-        """Main game loop."""
+        """Main game loop with fully working Split, Double Down, and Insurance (Mouse Controlled)."""
         while self.is_playing:
-            screen.fill(GREEN)
+            # 🛑 Step 1: Bet Selection
+            selecting_bet = True
+            while selecting_bet:
+                screen.fill(GREEN)
+                if background:
+                    screen.blit(background, (0, 0))
 
-            if background:
-                screen.blit(background, (0, 0))
+                # Draw bet buttons
+                bet_rect_plus = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 + 80, SCREEN_HEIGHT // 2 - 20, 40, 40))
+                bet_rect_minus = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 - 120, SCREEN_HEIGHT // 2 - 20, 40, 40))
+                start_rect = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 - 70, SCREEN_HEIGHT // 2 + 60, 140, 50))
 
-            display_text(f"Balance: ${self.player_balance}", 20, 20)
-            display_text(f"Bet: ${self.bet_amount}", 20, 50)
+                # Display bet info
+                display_text(f"Balance: ${self.player_balance}", 20, 20)
+                display_text(f"Bet: ${self.bet_amount}", SCREEN_WIDTH // 2 - 30, SCREEN_HEIGHT // 2 - 50, WHITE)
+                display_text("+", SCREEN_WIDTH // 2 + 95, SCREEN_HEIGHT // 2, BLACK)
+                display_text("-", SCREEN_WIDTH // 2 - 105, SCREEN_HEIGHT // 2, BLACK)
+                display_text("Start Round", SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT // 2 + 75, BLACK)
 
-            self.player_hand.display(200, 400)
-            self.dealer_hand.display(200, 100, hide_first=self.player_turn)
+                pygame.display.flip()
 
-            display_text(self.status_message, SCREEN_WIDTH // 2 - 100, 50, WHITE)
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.is_playing = False
+                        selecting_bet = False
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        mouse_pos = pygame.mouse.get_pos()
+                        if bet_rect_plus.collidepoint(mouse_pos) and self.bet_amount + 50 <= self.player_balance:
+                            self.bet_amount += 50
+                        elif bet_rect_minus.collidepoint(mouse_pos) and self.bet_amount - 50 >= 50:
+                            self.bet_amount -= 50
+                        elif start_rect.collidepoint(mouse_pos):
+                            selecting_bet = False
 
-            for event in pygame.event.get():
-                self.handle_event(event)
+            # 🛑 Step 2: Start Round
+            self.player_balance -= self.bet_amount  
+            self.deck = CardDeck()
+            self.player_hand = PlayerHand()
+            self.dealer_hand = PlayerHand()
+            self.split_hand = None  
+            self.active_hand = self.player_hand  # Track active hand
+            self.player_turn = True
+            self.round_over = False
+            self.doubled_down = False
+            self.first_move = True  # ✅ Track if it's the player's first move
 
-            pygame.display.flip()
+            for _ in range(2):
+                self.player_hand.add_card(self.deck.draw_card())
+                self.dealer_hand.add_card(self.deck.draw_card())
+
+            # 🛑 Step 3: Check Available Moves
+            can_split = (len(self.player_hand.cards) == 2 and self.player_hand.cards[0].split('_')[0] == self.player_hand.cards[1].split('_')[0])
+            can_insure = (self.dealer_hand.cards[0].split("_")[0] == "ace")
+
+            # 🛑 Step 4: Main Game Loop
+            while not self.round_over:
+                screen.fill(GREEN)
+                if background:
+                    screen.blit(background, (0, 0))
+
+                # Draw action buttons
+                hit_rect = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT - 80, 100, 50))
+                stand_rect = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT - 80, 100, 50))
+                double_rect = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 + 100, SCREEN_HEIGHT - 80, 100, 50)) if self.first_move and not self.doubled_down else None
+                split_rect = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 + 250, SCREEN_HEIGHT - 80, 100, 50)) if can_split and self.split_hand is None else None
+
+                # Display hands and totals
+                self.player_hand.display(200, 400)
+                if self.split_hand:
+                    self.split_hand.display(500, 400)
+                self.dealer_hand.display(200, 100, hide_first=self.player_turn)
+                display_text(f"Player Total: {self.active_hand.total_value}", 200, 550, WHITE)
+                display_text(f"Dealer Total: {'?' if self.player_turn else self.dealer_hand.total_value}", 200, 250, WHITE)
+                display_text(f"Balance: ${self.player_balance}", 20, 20)
+                display_text(f"Bet: ${self.bet_amount}", 20, 50)
+
+                # Button Labels
+                display_text("Hit", SCREEN_WIDTH // 2 - 180, SCREEN_HEIGHT - 65, BLACK)
+                display_text("Stand", SCREEN_WIDTH // 2 - 30, SCREEN_HEIGHT - 65, BLACK)
+                if double_rect:
+                    display_text("Double", SCREEN_WIDTH // 2 + 120, SCREEN_HEIGHT - 65, BLACK)
+                if split_rect:
+                    display_text("Split", SCREEN_WIDTH // 2 + 270, SCREEN_HEIGHT - 65, BLACK)
+
+                pygame.display.flip()
+
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.is_playing = False
+                        self.round_over = True
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        mouse_pos = pygame.mouse.get_pos()
+
+                        if hit_rect.collidepoint(mouse_pos) and self.player_turn:
+                            self.active_hand.add_card(self.deck.draw_card())
+                            self.first_move = False  # ✅ Disable double down after first move
+                            if self.active_hand.total_value > 21:
+                                self.status_message = "You Busted! Dealer Wins."
+                                self.round_over = True
+
+                        elif stand_rect.collidepoint(mouse_pos):
+                            self.player_turn = False
+                            while self.dealer_hand.total_value < 17:
+                                self.dealer_hand.add_card(self.deck.draw_card())
+                            self.round_over = True
+                            self.status_message = determine_winner(self.player_hand, self.dealer_hand)
+
+                        elif double_rect and double_rect.collidepoint(mouse_pos):
+                            if self.first_move:  # ✅ Double down only possible on first move
+                                self.player_balance -= self.bet_amount
+                                self.bet_amount *= 2
+                                self.active_hand.add_card(self.deck.draw_card())
+                                self.first_move = False
+                                self.doubled_down = True
+                                self.player_turn = False
+                                while self.dealer_hand.total_value < 17:
+                                    self.dealer_hand.add_card(self.deck.draw_card())
+                                self.round_over = True
+                                self.status_message = determine_winner(self.player_hand, self.dealer_hand)
+
+                        elif split_rect and split_rect.collidepoint(mouse_pos):
+                            if can_split and self.split_hand is None:
+                                self.split_hand = PlayerHand()
+                                self.split_hand.add_card(self.player_hand.cards.pop())
+                                self.player_hand.add_card(self.deck.draw_card())
+                                self.split_hand.add_card(self.deck.draw_card())
+                                self.active_hand = self.player_hand  # Start playing left hand first
+
+            # ✅ Display "Next Round" button before restarting the game
+            waiting_for_next_round = True
+            while waiting_for_next_round:
+                screen.fill(GREEN)
+                if background:
+                    screen.blit(background, (0, 0))
+
+                self.player_hand.display(200, 400)
+                self.dealer_hand.display(200, 100, hide_first=False)
+                display_text(self.status_message, SCREEN_WIDTH // 2 - 70, SCREEN_HEIGHT // 2 - 50, RED)
+
+                next_round_rect = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 - 70, SCREEN_HEIGHT // 2 + 60, 140, 50))
+                display_text("Next Round", SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT // 2 + 75, BLACK)
+
+                pygame.display.flip()
+
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.is_playing = False
+                        waiting_for_next_round = False
+                    elif event.type == pygame.MOUSEBUTTONDOWN and next_round_rect.collidepoint(pygame.mouse.get_pos()):
+                        waiting_for_next_round = False
+
 
         pygame.quit()
-
 if __name__ == "__main__":
     game = BlackjackGame()
     game.run()
