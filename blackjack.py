@@ -97,6 +97,12 @@ class PlayerHand:
             else:
                 screen.blit(CARD_IMAGES[card], (x + i * 30, y))
 
+    def clear_hand(self):
+        """Clear the hand for a new round."""
+        self.cards = []
+        self.total_value = 0
+        self.ace_count = 0
+
 def determine_winner(player, dealer):
     """Logic to determine the winner of the round."""
     if player.total_value > 21:
@@ -343,18 +349,19 @@ class BlackjackGame:
                         # Reset for next round
                         self.reset_round()
                         waiting_for_next_round = False
-
-        def reset_round(self):
-            """Reset all necessary variables for the next round."""
-            self.player_hand.clear_hand()
-            self.split_hand = None
-            self.dealer_hand.clear_hand()
-            self.first_move = True
-            self.doubled_down = False
-            self.round_over = False
-            self.active_hand = self.player_hand
-                         
         pygame.quit()
+
+    def reset_round(self):
+        """Reset all necessary variables for the next round."""
+        self.player_hand.clear_hand()
+        self.split_hand = None
+        self.dealer_hand.clear_hand()
+        self.first_move = True
+        self.doubled_down = False
+        self.round_over = False
+        self.active_hand = self.player_hand
+                        
+        
 if __name__ == "__main__":
     game = BlackjackGame()
     game.run()
