@@ -323,7 +323,7 @@ class BlackjackGame:
                                 self.active_hand = self.player_hand  # Start playing the first hand
                                 self.first_move = True  # Reset first move for both hands
 
-            # ✅ Display "Next Round" button before restarting the game
+            # In de BlackjackGame class, bij de 'Next Round' knop
             waiting_for_next_round = True
             while waiting_for_next_round:
                 screen.fill(GREEN)
@@ -332,23 +332,31 @@ class BlackjackGame:
 
                 self.player_hand.display(200, 400)
                 if self.split_hand:
-                    self.split_hand.display(500, 400)
+                   self.split_hand.display(500, 400)
                 self.dealer_hand.display(200, 100, hide_first=False)
                 display_text(self.status_message, SCREEN_WIDTH // 2 - 70, SCREEN_HEIGHT // 2 - 50, RED)
 
+                # ✅ Nieuwe knop voor terug naar menu
                 next_round_rect = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 - 70, SCREEN_HEIGHT // 2 + 60, 140, 50))
+                menu_rect = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 - 70, SCREEN_HEIGHT // 2 + 120, 140, 50))  # Nieuwe knop
+
                 display_text("Next Round", SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT // 2 + 75, BLACK)
+                display_text("Back to Menu", SCREEN_WIDTH // 2 - 60, SCREEN_HEIGHT // 2 + 135, BLACK)  # Tekst voor de nieuwe knop
 
                 pygame.display.flip()
 
                 for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        self.is_playing = False
-                        waiting_for_next_round = False
-                    elif event.type == pygame.MOUSEBUTTONDOWN and next_round_rect.collidepoint(pygame.mouse.get_pos()):
-                        # Reset for next round
-                        self.reset_round()
-                        waiting_for_next_round = False
+                        if event.type == pygame.QUIT:
+                            self.is_playing = False
+                            waiting_for_next_round = False
+                        elif event.type == pygame.MOUSEBUTTONDOWN:
+                            mouse_pos = pygame.mouse.get_pos()
+                        if next_round_rect.collidepoint(mouse_pos):
+                            self.reset_round()
+                            waiting_for_next_round = False
+                        elif menu_rect.collidepoint(mouse_pos):  # ⬅️ Als de speler op "Back to Menu" klikt
+                            return  # ⬅️ Sluit de BlackjackGame-loop en keert terug naar het menu
+
         pygame.quit()
 
     def reset_round(self):
