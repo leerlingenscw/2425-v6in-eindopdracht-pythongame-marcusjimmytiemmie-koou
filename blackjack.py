@@ -150,8 +150,8 @@ class BlackjackGame:
         self.active_hand = self.player_hand
         self.first_move = True  # Houdt bij of dit de eerste zet is
         self.can_split = True   # Houdt bij of splitsen nog is toegestaan
-        self.player_balance = 1000
-        self.bet_amount = 50
+        self.player_balance = 100
+        self.bet_amount = 10
         self.is_playing = True
         self.player_turn = True
         self.round_over = False
@@ -203,7 +203,7 @@ class BlackjackGame:
     def run(self):
         """Main game loop with fully working Split, Double Down, and Insurance (Mouse Controlled)."""
         while self.is_playing:
-            # 🛑 Step 1: Bet Selection
+            # Step 1: Bet Selection
             selecting_bet = True
             while selecting_bet:
                 screen.fill(GREEN)
@@ -230,18 +230,18 @@ class BlackjackGame:
                         selecting_bet = False
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         mouse_pos = pygame.mouse.get_pos()
-                        if bet_rect_plus.collidepoint(mouse_pos) and self.bet_amount + 50 <= self.player_balance:
-                            self.bet_amount += 50
-                        elif bet_rect_minus.collidepoint(mouse_pos) and self.bet_amount - 50 >= 50:
-                            self.bet_amount -= 50
+                        if bet_rect_plus.collidepoint(mouse_pos) and self.bet_amount + 5 <= self.player_balance:
+                            self.bet_amount += 5
+                        elif bet_rect_minus.collidepoint(mouse_pos) and self.bet_amount - 5 >= 5:
+                            self.bet_amount -= 5
                         elif start_rect.collidepoint(mouse_pos):
                             if self.bet_amount > self.player_balance:  # Check of er genoeg saldo is
-                                self.status_message = "Niet genoeg saldo!"
+                                self.status_message = "Niet genoeg saldo! Brokie!"
                             else:
                                 selecting_bet = False
 
 
-            # 🛑 Step 2: Start Round
+            # Step 2: Start Round
             self.deck = CardDeck()
             self.player_hand = PlayerHand()
             self.dealer_hand = PlayerHand()
@@ -254,7 +254,7 @@ class BlackjackGame:
             if self.player_balance >= self.bet_amount:
                 self.player_balance -= self.bet_amount
             else:
-                self.status_message = "Niet genoeg saldo!"
+                self.status_message = "Niet genoeg saldo! Brokie!"
                 return  # Stop de ronde als er te weinig saldo is
 
 
@@ -263,11 +263,11 @@ class BlackjackGame:
                 self.player_hand.add_card(self.deck.draw_card())
                 self.dealer_hand.add_card(self.deck.draw_card())
 
-            # 🛑 Step 3: Check Available Moves
+            # Step 3: Check Available Moves
             can_split = (len(self.player_hand.cards) == 2 and self.player_hand.cards[0].split('_')[0] == self.player_hand.cards[1].split('_')[0])
             can_insure = (self.dealer_hand.cards[0].split("_")[0] == "ace")
 
-            # 🛑 Step 4: Main Game Loop
+            # Step 4: Main Game Loop
             while not self.round_over:
                 screen.fill(GREEN)
                 if background:
@@ -367,7 +367,7 @@ class BlackjackGame:
                         elif double_rect and double_rect.collidepoint(mouse_pos):
                             if self.first_move:  # Double down only possible on first move
                                 if self.bet_amount > self.player_balance:
-                                    self.status_message = "Not enough balance for double down!"
+                                    self.status_message = "Not enough balance for double down! Brokie!"
                                 else:
                                     self.player_balance -= self.bet_amount
                                     self.bet_amount *= 2
@@ -415,9 +415,9 @@ class BlackjackGame:
 
             # In de BlackjackGame class, bij de 'Next Round' knop
             waiting_for_next_round = True
-            next_round_rect = None  # ✅ Zorgt ervoor dat de variabele altijd bestaat
-            menu_rect = None  # ✅ Zorgt ervoor dat deze variabele ook altijd bestaat
-            exit_rect = None  # ✅ Exit-knop bestaat nu altijd, maar wordt alleen gebruikt indien nodig
+            next_round_rect = None  #  Zorgt ervoor dat de variabele altijd bestaat
+            menu_rect = None  #  Zorgt ervoor dat deze variabele ook altijd bestaat
+            exit_rect = None  #  Exit-knop bestaat nu altijd, maar wordt alleen gebruikt indien nodig
 
             while waiting_for_next_round:
                 screen.fill(GREEN)
@@ -450,11 +450,11 @@ class BlackjackGame:
                         waiting_for_next_round = False
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         mouse_pos = pygame.mouse.get_pos()
-                        if next_round_rect and next_round_rect.collidepoint(mouse_pos):  # ✅ Controleer eerst of het niet None is
+                        if next_round_rect and next_round_rect.collidepoint(mouse_pos):  #  Controleer eerst of het niet None is
                             waiting_for_next_round = False
-                        elif menu_rect and menu_rect.collidepoint(mouse_pos):  # ✅ Controleer of menu_rect bestaat
+                        elif menu_rect and menu_rect.collidepoint(mouse_pos):  #  Controleer of menu_rect bestaat
                             return  
-                        elif exit_rect and exit_rect.collidepoint(mouse_pos):  # ✅ Alleen als exit_rect bestaat
+                        elif exit_rect and exit_rect.collidepoint(mouse_pos):  #  Alleen als exit_rect bestaat
                             pygame.quit()
                             exit()
 
