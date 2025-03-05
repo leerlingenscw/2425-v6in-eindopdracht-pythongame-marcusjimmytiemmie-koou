@@ -46,12 +46,6 @@ for suit in SUITS:
             img = pygame.transform.scale(img, (CARD_WIDTH, CARD_HEIGHT))
             CARD_IMAGES[f"{rank}_of_{suit}"] = img
 
-# Load Sound Effects
-hit_sound = pygame.mixer.Sound("sounds/hit.wav") if os.path.exists("sounds/hit.wav") else None
-win_sound = pygame.mixer.Sound("sounds/win.wav") if os.path.exists("sounds/win.wav") else None
-lose_sound = pygame.mixer.Sound("sounds/lose.wav") if os.path.exists("sounds/lose.wav") else None
-chip_sound = pygame.mixer.Sound("sounds/chip.wav") if os.path.exists("sounds/chip.wav") else None
-
 # Font Configuration
 font = pygame.font.Font(None, 36)
 
@@ -115,7 +109,7 @@ def determine_winner(player, dealer, split_hand=None):
             game.player_balance += game.bet_amount * 2  # Winst = dubbel de inzet
             return f"{hand_name}Player Wins!"
         elif player_hand.total_value == dealer.total_value:
-            game.player_balance += game.bet_amount  # ✅ Gelijkspel = inzet terug
+            game.player_balance += game.bet_amount  # Gelijkspel = inzet terug
             return f"{hand_name}Tie!"
         else:
             return f"{hand_name}Dealer Wins!"
@@ -171,8 +165,6 @@ class BlackjackGame:
             if self.player_turn and not self.round_over:
                 if event.key == pygame.K_h:
                     self.player_hand.add_card(self.deck.draw_card())
-                    if hit_sound:
-                        hit_sound.play()
                     if self.player_hand.total_value > 21:
                         self.player_turn = False
                         self.round_over = True
@@ -183,20 +175,10 @@ class BlackjackGame:
             if not self.player_turn and not self.round_over:
                 while self.dealer_hand.total_value < 17:
                     self.dealer_hand.add_card(self.deck.draw_card())
-                    if hit_sound:
-                        hit_sound.play()
                     time.sleep(0.5)
 
                 self.round_over = True
                 self.status_message = determine_winner(self.player_hand, self.dealer_hand, self.split_hand)
-                if "Player" in self.status_message:
-                    self.player_balance += self.bet_amount
-                    if win_sound:
-                        win_sound.play()
-                else:
-                    self.player_balance -= self.bet_amount
-                    if lose_sound:
-                        lose_sound.play()
 
                 
 
@@ -250,7 +232,7 @@ class BlackjackGame:
             self.player_turn = True
             self.round_over = False
             self.doubled_down = False
-            self.first_move = True  # ✅ Track if it's the player's first move
+            self.first_move = True  # Track if it's the player's first move
             if self.player_balance >= self.bet_amount:
                 self.player_balance -= self.bet_amount
             else:
@@ -291,13 +273,26 @@ class BlackjackGame:
                 display_text(f"Balance: ${self.player_balance}", 20, 20)
                 display_text(f"Bet: ${self.bet_amount}", SCREEN_WIDTH // 2 - 30, SCREEN_HEIGHT // 2 - 50, WHITE)
 
-                # **Display active hand indicator only when splitting**
+                # Display active hand indicator only when splitting
                 if self.split_hand:
-                    if self.active_hand == self.player_hand:
-                        pygame.draw.rect(screen, (255, 0, 0), (200, 390, CARD_WIDTH * 2, CARD_HEIGHT), 5)  # Red border for Hand 1
-                    elif self.active_hand == self.split_hand:
-                        pygame.draw.rect(screen, (255, 0, 0), (500, 390, CARD_WIDTH * 2, CARD_HEIGHT), 5)  # Red border for Hand 2
+                    arrow_width = 20  # Adjust the width of the arrow
+                    arrow_height = 10  # Adjust the height of the arrow
+                    arrow_offset = 10  # Space between the arrow and the cards
 
+                    if self.active_hand == self.player_hand:
+                        # Draw arrow above Hand 1
+                        pygame.draw.polygon(screen, (255, 255, 0), [
+                            (200 + CARD_WIDTH, 390 - arrow_offset),  # Left base of the arrow
+                            (200 + CARD_WIDTH - arrow_width, 390 - arrow_offset - arrow_height),  # Left tip of the arrow
+                            (200 + CARD_WIDTH + arrow_width, 390 - arrow_offset - arrow_height)  # Right tip of the arrow
+                        ])
+                    elif self.active_hand == self.split_hand:
+                        # Draw arrow above Hand 2
+                        pygame.draw.polygon(screen, (255, 255, 0), [
+                            (500 + CARD_WIDTH, 390 - arrow_offset),  # Left base of the arrow
+                            (500 + CARD_WIDTH - arrow_width, 390 - arrow_offset - arrow_height),  # Left tip of the arrow
+                            (500 + CARD_WIDTH + arrow_width, 390 - arrow_offset - arrow_height)  # Right tip of the arrow
+                        ])
                 # Button Labels
                 display_text("Hit", SCREEN_WIDTH // 2 - 180, SCREEN_HEIGHT - 65, BLACK)
                 display_text("Stand", SCREEN_WIDTH // 2 - 30, SCREEN_HEIGHT - 65, BLACK)
@@ -316,10 +311,10 @@ class BlackjackGame:
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         mouse_pos = pygame.mouse.get_pos()
 
-                        if bet_rect_plus.collidepoint(mouse_pos) and self.bet_amount + 50 <= self.player_balance:
-                            self.bet_amount += 50
-                        elif bet_rect_minus.collidepoint(mouse_pos) and self.bet_amount - 50 >= 50:
-                            self.bet_amount -= 50
+                        if bet_rect_plus.collidepoint(mouse_pos) and self.bet_amount + 5 <= self.player_balance:
+                            self.bet_amount += 5
+                        elif bet_rect_minus.collidepoint(mouse_pos) and self.bet_amount - 5 >= 5:
+                            self.bet_amount -= 5
                         elif start_rect.collidepoint(mouse_pos):
                             if self.bet_amount > self.player_balance:
                                 self.status_message = "Not enough balance!"
@@ -327,45 +322,40 @@ class BlackjackGame:
                             else:
                                 self.player_balance -= self.bet_amount
 
-
                         if hit_rect.collidepoint(mouse_pos) and self.player_turn:
                             self.active_hand.add_card(self.deck.draw_card())
 
-                            if self.active_hand.total_value > 21:  # Check of de actieve hand bust gaat
-                                self.active_hand.is_bust = True  # Markeer de hand als bust
+                            if self.active_hand.total_value > 21:  # Check if the active hand busts
+                                self.active_hand.is_bust = True  # Mark the hand as busted
 
                                 if self.split_hand and self.active_hand == self.player_hand:
-                                    # Als de eerste hand bust gaat en er is een tweede hand, wissel naar die hand
+                                    # If the first hand busts and there is a second hand, switch to that hand
                                     self.active_hand = self.split_hand
-                                    self.first_move = True  # Reset de eerste zet voor de tweede hand
+                                    self.first_move = True  # Reset the first move for the second hand
                                     self.status_message = "Hand 1 Busted! Switching to Hand 2."
                                 else:
-                                    # Als beide handen bust zijn of als er geen split is, verlies direct
+                                    # If both hands are busted or there's no split, end the round
                                     if self.split_hand and self.split_hand.is_bust:
                                         self.status_message = "Both Hands Busted! Dealer Wins."
                                     else:
                                         self.status_message = "You Busted! Dealer Wins."
                                     self.round_over = True
 
-
-
                         elif stand_rect.collidepoint(mouse_pos):
                             if self.split_hand and self.active_hand == self.player_hand:
-                                # Speler heeft gestand op eerste hand, wissel naar tweede hand
+                                # Player stands on the first hand, switch to the second hand
                                 self.active_hand = self.split_hand
-                                self.first_move = True  # Reset eerste zet voor Hand 2
+                                self.first_move = True  # Reset the first move for Hand 2
                             else:
-                                # Beide handen zijn gespeeld, dealer is aan de beurt
+                                # Both hands are played, dealer's turn
                                 self.player_turn = False
                                 while self.dealer_hand.total_value < 17:
                                     self.dealer_hand.add_card(self.deck.draw_card())
                                 self.round_over = True
                                 self.status_message = determine_winner(self.player_hand, self.dealer_hand, self.split_hand)
 
-
-
-                        elif double_rect and double_rect.collidepoint(mouse_pos):
-                            if self.first_move:  # Double down only possible on first move
+                        elif double_rect.collidepoint(mouse_pos):
+                            if self.first_move:  # Double down only possible on the first move
                                 if self.bet_amount > self.player_balance:
                                     self.status_message = "Not enough balance for double down! Brokie!"
                                 else:
@@ -381,36 +371,40 @@ class BlackjackGame:
                                 self.round_over = True
                                 self.status_message = determine_winner(self.player_hand, self.dealer_hand)
 
-                        elif split_rect and split_rect.collidepoint(mouse_pos):
+                        elif split_rect.collidepoint(mouse_pos):
                             if self.can_split and self.split_hand is None:
+                                # Player splits, create second hand
                                 self.split_hand = PlayerHand()
-                                
-                                # Verplaats de kaart naar de tweede hand en update beide handen opnieuw
+
+                                # Move the card to the second hand and update both hands
                                 card_to_move = self.player_hand.cards.pop()
                                 self.split_hand.add_card(card_to_move)
-                                
-                                remaining_card = self.player_hand.cards[0]  # De kaart die achterblijft na split
+
+                                remaining_card = self.player_hand.cards[0]  # The card left in the original hand
                                 self.player_hand.clear_hand()
                                 self.player_hand.add_card(remaining_card)
-                                
-                                # Voeg nieuwe kaarten toe aan beide handen
-                                self.player_hand.add_card(self.deck.draw_card())  
-                                self.split_hand.add_card(self.deck.draw_card())  
-                                
-                                print(f"Hand 1: {self.player_hand.cards}, waarde: {self.player_hand.total_value}")
-                                print(f"Hand 2: {self.split_hand.cards}, waarde: {self.split_hand.total_value}")
-                                
-                                self.active_hand = self.player_hand  
-                                self.first_move = False  # Zorgt ervoor dat de hand niet opnieuw gesplitst kan worden
-                                self.can_split = False  # Voorkomt dat er na een hit opnieuw gesplitst wordt
 
-                        elif hit_rect and hit_rect.collidepoint(mouse_pos):
-                            # Speler kiest om te hitten
+                                # Add one new card to each hand
+                                self.player_hand.add_card(self.deck.draw_card())  
+                                self.split_hand.add_card(self.deck.draw_card())
+
+                                print(f"Hand 1: {self.player_hand.cards}, value: {self.player_hand.total_value}")
+                                print(f"Hand 2: {self.split_hand.cards}, value: {self.split_hand.total_value}")
+
+                                # Double the bet for the second hand
+                                self.player_balance -= self.bet_amount  # Deduct the bet for the second hand
+                                self.bet_amount *= 2  # Double the bet
+
+                                # Set active hand to the first hand and reset necessary flags
+                                self.active_hand = self.player_hand
+                                self.first_move = False  # Prevent the hand from being split again
+                                self.can_split = False  # Prevent splitting again after splitting
+
+                        elif hit_rect.collidepoint(mouse_pos):
+                            # Player chooses to hit
                             if self.active_hand:
                                 self.active_hand.add_card(self.deck.draw_card())
-                                self.can_split = False  # Na een hit mag er niet meer gesplitst worden
-  
-
+                                self.can_split = False  # After a hit, no more splitting allowed
 
 
             # In de BlackjackGame class, bij de 'Next Round' knop
