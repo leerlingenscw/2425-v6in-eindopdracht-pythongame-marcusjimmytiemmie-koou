@@ -24,14 +24,16 @@ SCREEN_WIDTH, SCREEN_HEIGHT = screen.get_size()  # Get new screen size after swi
 pygame.display.set_caption("Blackjack - VWO 6 Final Project")
 
 # Load background
-if not os.path.exists("background.jpg"):
-    raise FileNotFoundError("Background image not found!")
-background = pygame.transform.scale(pygame.image.load("background.jpg"), (SCREEN_WIDTH, SCREEN_HEIGHT))
+background_path = "background.jpg"
+if not os.path.exists(background_path):
+    raise FileNotFoundError(f"Background image '{background_path}' not found!")
+background = pygame.transform.scale(pygame.image.load(background_path), (SCREEN_WIDTH, SCREEN_HEIGHT))
 
 # Load Card Assets
-if not os.path.exists("cards/back.png"):
-    raise FileNotFoundError("Card back image not found!")
-CARD_BACK = pygame.transform.scale(pygame.image.load("cards/back.png"), (CARD_WIDTH, CARD_HEIGHT))
+card_back_path = "cards/back.png"
+if not os.path.exists(card_back_path):
+    raise FileNotFoundError(f"Card back image '{card_back_path}' not found!")
+CARD_BACK = pygame.transform.scale(pygame.image.load(card_back_path), (CARD_WIDTH, CARD_HEIGHT))
 
 # Load all playing card images
 CARD_IMAGES = {}
@@ -51,6 +53,16 @@ font = pygame.font.Font(None, 36)
 button_font = pygame.font.Font(None, 28)  # Smaller font for buttons
 large_font = pygame.font.Font(None, 72)  # Larger font for winning message
 title_font = pygame.font.Font(None, 100)  # Font for the main menu title
+
+# Card Flip Animation
+def flip_card_animation(card, x, y):
+    """Simulate a card flip animation."""
+    for i in range(10):
+        screen.blit(CARD_BACK, (x, y))
+        pygame.display.flip()
+        pygame.time.delay(50)
+    screen.blit(CARD_IMAGES[card], (x, y))
+    pygame.display.flip()
 
 class CardDeck:
     """Represents a shuffled deck of cards."""
@@ -90,13 +102,12 @@ class PlayerHand:
         if self.total_value > 21:
             self.is_bust = True  # Mark the hand as busted
 
-    def display(self, x, y, hide_first=False, hide_all_except_first=False):
+    def display(self, x, y, hide_second_card=False):
         """Render cards on screen."""
         for i, card in enumerate(self.cards):
-            if hide_first and i == 0:
+            if hide_second_card and i == 1:
+                # Hide the second card
                 screen.blit(CARD_BACK, (x + i * 30, y))
-            elif hide_all_except_first and i != 0:
-                continue  # Skip rendering cards after the first one
             else:
                 screen.blit(CARD_IMAGES[card], (x + i * 30, y))
 
@@ -114,17 +125,19 @@ def determine_winner(player, dealer, game, split_hand=None):
 
     def evaluate_hand(hand_name, player_hand):
         if player_hand.is_bust:
-            game.previous_losses += game.bet_amount
+            game.previous_losses += game.current_bet
+            game.player_balance -= game.current_bet  # Deduct the bet if the player loses
             return f"{hand_name}Dealer Wins!"
         elif dealer.is_bust or player_hand.total_value > dealer.total_value:
-            game.previous_winnings += game.bet_amount * 2
-            game.player_balance += game.bet_amount * 2
+            game.previous_winnings += game.current_bet * 2
+            game.player_balance += game.current_bet * 2  # Add double the bet if the player wins
             return f"{hand_name}Player Wins!"
         elif player_hand.total_value == dealer.total_value:
-            game.player_balance += game.bet_amount
+            game.player_balance += game.current_bet  # Return the bet if it's a tie
             return f"{hand_name}Tie!"
         else:
-            game.previous_losses += game.bet_amount
+            game.previous_losses += game.current_bet
+            game.player_balance -= game.current_bet  # Deduct the bet if the player loses
             return f"{hand_name}Dealer Wins!"
 
     # Evaluate Hand 1
@@ -173,9 +186,8 @@ class BlackjackGame:
         self.first_move = True
         self.can_split = True
         self.player_balance = 100
-        self.bet_amount = 10
-        self.original_bet = self.bet_amount
-        self.previous_bet = self.bet_amount  # Voeg deze regel toe om de vorige inzet te onthouden
+        self.original_bet = 10  # Default bet amount (set during bet placement)
+        self.current_bet = self.original_bet  # Current bet amount (can be doubled)
         self.is_playing = True
         self.player_turn = True
         self.round_over = False
@@ -196,7 +208,6 @@ class BlackjackGame:
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mouse_pos = pygame.mouse.get_pos()
 
-            # Check if the player clicked on a button
             if hit_rect.collidepoint(mouse_pos) and self.player_turn:
                 self.active_hand.add_card(self.deck.draw_card())
                 self.first_move = False  # Disable doubling down after hitting
@@ -205,36 +216,32 @@ class BlackjackGame:
                     self.active_hand.is_bust = True  # Mark the hand as busted
 
                     if self.split_hand and self.active_hand == self.player_hand:
-                        # If the first hand busts and there is a second hand, switch to that hand
                         self.active_hand = self.split_hand
                         self.first_move = True  # Reset the first move for the second hand
                         self.status_message = "Hand 1 Busted! Switching to Hand 2."
                     else:
-                        # If both hands are busted or there's no split, end the round
                         if self.split_hand and self.split_hand.is_bust:
-                            self.status_message = "Both Hands Busted! Dealer Wins."
+                            self.status_message = "Hand 2 Busted! Dealer Wins."
                         else:
                             self.status_message = "You Busted! Dealer Wins."
                         self.round_over = True
 
             elif stand_rect.collidepoint(mouse_pos):
                 if self.split_hand and self.active_hand == self.player_hand:
-                    # Player stands on the first hand, switch to the second hand
                     self.active_hand = self.split_hand
                     self.first_move = True  # Reset the first move for Hand 2
                     self.status_message = "Switching to Hand 2."
                 else:
-                    # Both hands are played, dealer's turn
                     self.player_turn = False
                     self.handle_dealer_turn()
 
             elif double_rect and double_rect.collidepoint(mouse_pos):  # Check if double_rect exists
                 if self.first_move:  # Double down only possible on the first move
-                    if self.bet_amount > self.player_balance:
+                    if self.player_balance < self.current_bet:  # Check if the player has enough balance
                         self.status_message = "Not enough balance for double down! Brokie!"
                     else:
-                        self.player_balance -= self.bet_amount
-                        self.bet_amount *= 2
+                        self.player_balance -= self.current_bet  # Deduct the current bet
+                        self.current_bet *= 2  # Double the current bet
                         self.active_hand.add_card(self.deck.draw_card())
                         self.first_move = False
                         self.doubled_down = True
@@ -245,14 +252,10 @@ class BlackjackGame:
                                 self.active_hand = self.split_hand
                                 self.first_move = True
                                 self.status_message = "Hand 1 Busted! Switching to Hand 2."
-                            elif self.split_hand and self.split_hand.is_bust:
-                                self.status_message = "Both Hands Busted! Dealer Wins."
-                                self.round_over = True
                             else:
-                                self.status_message = "You Busted! Dealer Wins."
-                                self.round_over = True
+                                self.player_turn = False
+                                self.handle_dealer_turn()
                         else:
-                            # Nieuwe code toegevoegd
                             if self.split_hand and self.active_hand == self.player_hand:
                                 self.active_hand = self.split_hand
                                 self.first_move = True
@@ -262,33 +265,53 @@ class BlackjackGame:
                                 self.handle_dealer_turn()
 
             elif split_rect and split_rect.collidepoint(mouse_pos):
-                if self.can_split and self.split_hand is None and self.player_balance >= self.bet_amount:
+                if self.can_split and self.split_hand is None and self.player_balance >= self.current_bet:
                     self.split_hand = PlayerHand()
                     card_to_move = self.player_hand.cards.pop()
                     self.split_hand.add_card(card_to_move)
+                    remaining_card = self.player_hand.cards[0]  # The card left in the original hand
+                    self.player_hand.clear_hand()  # Clear and reset the original hand
+                    self.player_hand.add_card(remaining_card)
                     self.player_hand.add_card(self.deck.draw_card())
                     self.split_hand.add_card(self.deck.draw_card())
-                    self.player_balance -= self.bet_amount
-                    self.bet_amount *= 2
+                    self.player_balance -= self.current_bet
+                    self.current_bet *= 2
                     self.can_split = False
                     self.status_message = "Hand split! Playing Hand 1 first."
 
     def handle_dealer_turn(self):
         """Handle the dealer's turn and determine the winner."""
+        # Reveal the hidden card with a flip animation
+        flip_card_animation(self.dealer_hand.cards[1], SCREEN_WIDTH // 2 - 50 + 30, 100)  # Flip the second card
+
+        # Dealer hits until reaching 17 or higher
         while self.dealer_hand.total_value < 17:
-            self.dealer_hand.add_card(self.deck.draw_card())
-            pygame.time.delay(200)  # Add a slight delay for realism
+            new_card = self.deck.draw_card()
+            self.dealer_hand.add_card(new_card)
+            
+            # Animate the new card being dealt
+            for i in range(10):
+                screen.blit(CARD_BACK, (SCREEN_WIDTH // 2 - 50 + (len(self.dealer_hand.cards) - 1) * 30, 100))
+                pygame.display.flip()
+                pygame.time.delay(50)
+            
+            screen.blit(CARD_IMAGES[new_card], (SCREEN_WIDTH // 2 - 50 + (len(self.dealer_hand.cards) - 1) * 30, 100))
+            pygame.display.flip()
+            pygame.time.delay(500)  # Add a slight delay for realism
+
+            # Update dealer's total value display
+            dealer_x = SCREEN_WIDTH // 2 - 50  # Center dealer's hand
+            display_text(f"Dealer Total: {self.dealer_hand.total_value}", dealer_x, 250, WHITE)
+            pygame.display.flip()
 
         self.round_over = True
         self.status_message = determine_winner(self.player_hand, self.dealer_hand, self, self.split_hand)
         if "Player Wins!" in self.status_message:
             display_winning_animation()  # Show winning animation if the player wins
         elif "Dealer Wins!" in self.status_message:
-            display_balance_change(-self.bet_amount)  # Show loss animation
+            display_balance_change(-self.current_bet)  # Show loss animation
         else:
             display_balance_change(0)  # Show tie animation
-
-        self.bet_amount = self.original_bet
 
     def run(self):
         """Main game loop with fully working Split, Double Down, and Insurance (Mouse Controlled)."""
@@ -311,7 +334,7 @@ class BlackjackGame:
 
                 # Display balance, previous winnings, and losses
                 display_text(f"Balance: ${self.player_balance}", 20, 20, RED if self.player_balance == 0 else WHITE)
-                display_text(f"Bet: ${self.bet_amount}", SCREEN_WIDTH // 2 - 30, SCREEN_HEIGHT // 2 - 50, WHITE)
+                display_text(f"Bet: ${self.original_bet}", SCREEN_WIDTH // 2 - 30, SCREEN_HEIGHT // 2 - 50, WHITE)
                 display_text("+", SCREEN_WIDTH // 2 + 95, SCREEN_HEIGHT // 2, BLACK)
                 display_text("-", SCREEN_WIDTH // 2 - 105, SCREEN_HEIGHT // 2, BLACK)
                 display_text("Start Round", SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT // 2 + 75, BLACK, button_font)
@@ -330,20 +353,21 @@ class BlackjackGame:
                         selecting_bet = False
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         mouse_pos = pygame.mouse.get_pos()
-                        if bet_rect_plus.collidepoint(mouse_pos) and self.bet_amount + 5 <= self.player_balance:
-                            self.bet_amount += 5
+                        if bet_rect_plus.collidepoint(mouse_pos) and self.original_bet + 5 <= self.player_balance:
+                            self.original_bet += 5  # Update original_bet
+                            self.current_bet = self.original_bet  # Reset current_bet to original_bet
                             self.previous_winnings = 0
                             self.previous_losses = 0
-                        elif bet_rect_minus.collidepoint(mouse_pos) and self.bet_amount - 5 >= 5:
-                            self.bet_amount -= 5
+                        elif bet_rect_minus.collidepoint(mouse_pos) and self.original_bet - 5 >= 5:
+                            self.original_bet -= 5  # Update original_bet
+                            self.current_bet = self.original_bet  # Reset current_bet to original_bet
                             self.previous_winnings = 0
                             self.previous_losses = 0
                         elif start_rect.collidepoint(mouse_pos):
-                            if self.bet_amount > self.player_balance:
-                                self.status_message = "Niet genoeg saldo! Brokie!"
+                            if self.original_bet > self.player_balance:
+                                self.status_message = "Not enough balance! Brokie!"
                             else:
                                 selecting_bet = False
-                                self.previous_bet = self.bet_amount  # Sla de huidige inzet op als de vorige inzet
 
             # Step 2: Start Round
             self.deck = CardDeck()
@@ -357,18 +381,17 @@ class BlackjackGame:
             self.first_move = True
             self.previous_winnings = 0
             self.previous_losses = 0
-            self.bet_amount = self.previous_bet  # Gebruik de vorige inzet in plaats van 10
-            if self.player_balance >= self.bet_amount:
-                self.player_balance -= self.bet_amount
+            self.current_bet = self.original_bet  # Reset current_bet to original_bet
+            if self.player_balance >= self.current_bet:
+                self.player_balance -= self.current_bet  # Deduct the bet at the start of the round
             else:
-                self.status_message = "Niet genoeg saldo! Brokie!"
+                self.status_message = "Not enough balance! Brokie!"
                 return
 
             # Initial cards deal
             for _ in range(2):
                 self.player_hand.add_card(self.deck.draw_card())
                 self.dealer_hand.add_card(self.deck.draw_card())
-
 
             # Step 3: Check Available Moves
             card1 = self.player_hand.cards[0].split('_')[0]
@@ -389,8 +412,8 @@ class BlackjackGame:
                 split_rect = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 + 250, SCREEN_HEIGHT - 80, 100, 50)) if can_split and self.split_hand is None else None
 
                 # Display hands and totals
-                dealer_x = SCREEN_WIDTH // 2 - (len(self.dealer_hand.cards) * 15)  # Center dealer's hand
-                self.dealer_hand.display(dealer_x, 100, hide_first=self.player_turn, hide_all_except_first=self.player_turn)
+                dealer_x = SCREEN_WIDTH // 2 - 50  # Center dealer's hand
+                self.dealer_hand.display(dealer_x, 100, hide_second_card=self.player_turn)
 
                 # Display the value of the first card during the player's turn
                 if self.player_turn and not self.round_over:
@@ -438,7 +461,7 @@ class BlackjackGame:
                     display_text(f"Player Total: {self.player_hand.total_value}", SCREEN_WIDTH // 2 - 75, 550, WHITE)
 
                 display_text(f"Balance: ${self.player_balance}", 20, 20, RED if self.player_balance == 0 else WHITE)
-                display_text(f"Bet: ${self.bet_amount}", SCREEN_WIDTH // 2 - 30, SCREEN_HEIGHT - 130, WHITE)
+                display_text(f"Bet: ${self.current_bet}", SCREEN_WIDTH // 2 - 30, SCREEN_HEIGHT - 130, WHITE)
 
                 # Button Labels (centered on buttons)
                 display_text("Hit", hit_rect.x + 25, hit_rect.y + 15, BLACK, button_font)
@@ -483,6 +506,7 @@ class BlackjackGame:
                                 # Player stands on the first hand, switch to the second hand
                                 self.active_hand = self.split_hand
                                 self.first_move = True  # Reset the first move for Hand 2
+                                self.status_message = "Switching to Hand 2."
                             else:
                                 # Both hands are played, dealer's turn
                                 self.player_turn = False
@@ -490,56 +514,47 @@ class BlackjackGame:
 
                         elif double_rect and double_rect.collidepoint(mouse_pos):  # Check if double_rect exists
                             if self.first_move:  # Double down only possible on the first move
-                                if self.bet_amount > self.player_balance:
+                                if self.player_balance < self.current_bet:  # Check if the player has enough balance
                                     self.status_message = "Not enough balance for double down! Brokie!"
-                                    if self.active_hand.is_bust: # Add this line
+                                else:
+                                    self.player_balance -= self.current_bet  # Deduct the current bet
+                                    self.current_bet *= 2  # Double the current bet
+                                    self.active_hand.add_card(self.deck.draw_card())
+                                    self.first_move = False
+                                    self.doubled_down = True
+                                    # Check if the hand is bust after doubling down
+                                    if self.active_hand.total_value > 21:
+                                        self.active_hand.is_bust = True
                                         if self.split_hand and self.active_hand == self.player_hand:
                                             self.active_hand = self.split_hand
                                             self.first_move = True
                                             self.status_message = "Hand 1 Busted! Switching to Hand 2."
                                         else:
-                                            if self.split_hand and self.split_hand.is_bust:
-                                                self.status_message = "Both Hands Busted! Dealer Wins."
-                                            else:
-                                                self.status_message = "You Busted! Dealer Wins."
-                                            self.round_over = True
+                                            self.player_turn = False
+                                            self.handle_dealer_turn()
                                     else:
-                                        self.player_turn = False
-                                        self.handle_dealer_turn()
-                                else:
-                                    self.player_balance -= self.bet_amount
-                                    self.bet_amount *= 2
-                                    self.active_hand.add_card(self.deck.draw_card())
-                                    self.first_move = False
-                                    self.doubled_down = True
-                                    self.player_turn = False
-                                    self.handle_dealer_turn()
+                                        if self.split_hand and self.active_hand == self.player_hand:
+                                            self.active_hand = self.split_hand
+                                            self.first_move = True
+                                            self.status_message = "Doubled Down! Switching to Hand 2."
+                                        else:
+                                            self.player_turn = False
+                                            self.handle_dealer_turn()
 
-                        elif split_rect and split_rect.collidepoint(mouse_pos):  # Check if split_rect exists
-                            if self.can_split and self.split_hand is None:
-                                # Player splits, create second hand
+                        elif split_rect and split_rect.collidepoint(mouse_pos):
+                            if self.can_split and self.split_hand is None and self.player_balance >= self.current_bet:
                                 self.split_hand = PlayerHand()
-
-                                # Move the card to the second hand and update both hands
                                 card_to_move = self.player_hand.cards.pop()
                                 self.split_hand.add_card(card_to_move)
-
                                 remaining_card = self.player_hand.cards[0]  # The card left in the original hand
-                                self.player_hand.clear_hand()
+                                self.player_hand.clear_hand()  # Clear and reset the original hand
                                 self.player_hand.add_card(remaining_card)
-
-                                # Add one new card to each hand
-                                self.player_hand.add_card(self.deck.draw_card())  
+                                self.player_hand.add_card(self.deck.draw_card())
                                 self.split_hand.add_card(self.deck.draw_card())
-
-                                # Double the bet for the second hand
-                                self.player_balance -= self.bet_amount  # Deduct the bet for the second hand
-                                self.bet_amount *= 2  # Double the bet
-
-                                # Set active hand to the first hand and reset necessary flags
-                                self.active_hand = self.player_hand
-                                self.first_move = True  # Reset first_move for the first hand to allow doubling down
-                                self.can_split = False  # Prevent splitting again after splitting
+                                self.player_balance -= self.current_bet
+                                self.current_bet *= 2
+                                self.can_split = False
+                                self.status_message = "Hand split! Playing Hand 1 first."
 
             # Step 5: Next Round or Exit
             waiting_for_next_round = True
@@ -551,9 +566,26 @@ class BlackjackGame:
                 screen.fill(GREEN)
                 screen.blit(background, (0, 0))
 
-                # Display the status message
-                display_text(self.status_message, SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 50, RED)
-                
+                # Display the final hands of the dealer and player on the left side
+                dealer_x = 50  # Position dealer's hand on the left side
+                self.dealer_hand.display(dealer_x, 100)  # Show all dealer cards
+                display_text(f"Dealer Total: {self.dealer_hand.total_value}", dealer_x, 250, WHITE)
+
+                if self.split_hand:
+                    # Display split hands below the dealer's hand
+                    self.player_hand.display(50, 400)  # Position Hand 1 on the left side
+                    self.split_hand.display(50, 550)  # Position Hand 2 below Hand 1
+                    display_text(f"Hand 1: {self.player_hand.total_value}", 50, 700, WHITE)
+                    display_text(f"Hand 2: {self.split_hand.total_value}", 50, 730, WHITE)
+                else:
+                    # Display single hand below the dealer's hand
+                    self.player_hand.display(50, 400)  # Position player's hand on the left side
+                    display_text(f"Player Total: {self.player_hand.total_value}", 50, 550, WHITE)
+
+                # Display the status message with smaller font
+                smaller_font = pygame.font.Font(None, 48)  # Smaller font for winner text
+                display_text(self.status_message, SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 50, RED, smaller_font)
+
                 # Display buttons for next round and main menu
                 if self.player_balance > 0:
                     next_round_rect = pygame.draw.rect(screen, WHITE, (SCREEN_WIDTH // 2 - 70, SCREEN_HEIGHT // 2 + 20, 140, 50))
@@ -574,11 +606,11 @@ class BlackjackGame:
                         waiting_for_next_round = False
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         mouse_pos = pygame.mouse.get_pos()
-                        if next_round_rect and next_round_rect.collidepoint(mouse_pos):  #  Controleer eerst of het niet None is
+                        if next_round_rect and next_round_rect.collidepoint(mouse_pos):  # Check if next_round_rect exists
                             waiting_for_next_round = False
-                        elif menu_rect and menu_rect.collidepoint(mouse_pos):  #  Controleer of menu_rect bestaat
+                        elif menu_rect and menu_rect.collidepoint(mouse_pos):  # Check if menu_rect exists
                             return  
-                        elif exit_rect and exit_rect.collidepoint(mouse_pos):  #  Alleen als exit_rect bestaat
+                        elif exit_rect and exit_rect.collidepoint(mouse_pos):  # Check if exit_rect exists
                             pygame.quit()
                             exit()
 
